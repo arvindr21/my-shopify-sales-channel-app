@@ -3,7 +3,7 @@ import { withRouter } from 'next/router';
 
 function ClientRouter(props) {
   const {router} = props;
-  console.log('ClientRouter', props);
+  // console.log('ClientRouter', props);
   return <AppBridgeClientRouter history={router} />;
 };
 

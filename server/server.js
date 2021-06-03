@@ -9,8 +9,11 @@ import Router from "koa-router";
 import dotenv from "dotenv";
 import next from "next";
 
+const SetupWebHooks = require('./webhooks/');
+
 const requestLogger = require('koa-log-requests');
-const getSubscriptionUrl = require('./getSubscriptionUrl');
+const getSubscriptionUrl = require('./api/getSubscriptionUrl');
+const getProducts = require('./api/getProducts');
 
 dotenv.config();
 
@@ -26,7 +29,7 @@ Shopify.Context.initialize({
   API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,
   SCOPES: process.env.SCOPES.split(","),
   HOST_NAME: process.env.HOST.replace(/https:\/\//, ""),
-  API_VERSION: ApiVersion.October20,
+  API_VERSION: ApiVersion.April21,
   IS_EMBEDDED_APP: true,
   // This should be replaced with your preferred storage strategy
   SESSION_STORAGE: new Shopify.Session.MemorySessionStorage(),
@@ -55,30 +58,17 @@ app.prepare().then(async () => {
         const host = getHost(ctx);
         ACTIVE_SHOPIFY_SHOPS[shop] = scope;
 
-        const response = await Shopify.Webhooks.Registry.register({
-          shop,
-          accessToken,
-          path: "/webhooks",
-          topic: "APP_UNINSTALLED",
-          webhookHandler: async (topic, shop, body) => {
-            console.log('Hook called', topic, shop);
-            delete ACTIVE_SHOPIFY_SHOPS[shop]
-          }
-        });
+        await getProducts(accessToken, shop);
 
-        if (!response.success) {
-          console.log(
-            `Failed to register APP_UNINSTALLED webhook: ${response.result}`
-          );
-        }
+        SetupWebHooks({
+          shop,
+          accessToken
+        })
 
         // Redirect to app with shop parameter upon auth
         // ctx.redirect(`/?shop=${shop}&host=${host}`);
         const returnUrl = `https://${Shopify.Context.HOST_NAME}?host=${host}&shop=${shop}`;
         const subscriptionUrl = await getSubscriptionUrl(accessToken, shop, returnUrl);
-        console.log('returnUrl', returnUrl);
-        console.log('Shopify.Context', Shopify.Context);
-        console.log('subscriptionUrl', subscriptionUrl);
         ctx.redirect(subscriptionUrl);
       },
     })
